@@ -1,2 +1,52 @@
 ---
-# tasks file for lighthouse-role
+- name: Install LightHouse and Configure Nginx
+  hosts: lighthouse
+  become: true
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.yum:
+        name: nginx
+        state: present
+
+    - name: Install Node.js
+      ansible.builtin.yum:
+        name: nodejs
+        state: present
+
+    - name: Clone LightHouse repository
+      ansible.builtin.git:
+        repo: "{{ lighthouse_repo }}"
+        dest: /var/www/lighthouse
+        version: "{{ lighthouse_version }}"
+
+    - name: Install LightHouse dependencies
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: /var/www/lighthouse
+
+    - name: Configure Nginx for LightHouse
+      ansible.builtin.copy:
+        dest: /etc/nginx/conf.d/lighthouse.conf
+        content: |
+          server {
+              listen {{ nginx_port }};
+              server_name lighthouse;
+
+              root /var/www/lighthouse;
+
+              location / {
+                  try_files $uri /index.html;
+              }
+          }
+      notify: Restart nginx
+
+    - name: Start and enable Nginx service
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
